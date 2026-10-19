@@ -203,7 +203,7 @@ async function refreshAuth() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) {
     isMember = false; loginBtn.hidden = false; logoutBtn.hidden = true;
-    state.textContent = "只有我们俩可以往这里添加内容。";
+    state.textContent = "会魔法的巫师请书写我们的篇章";
   } else {
     const { data: ok } = await sb.rpc("is_member");
     isMember = Boolean(ok);
