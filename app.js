@@ -165,8 +165,7 @@ function showItem(x) {
 }
 
 function render() {
-  const tl = $("#trip-list");
-  tl.innerHTML = data.trips.length ? data.trips.map(t => `
+  const memory = t => `
     <li class="trip">
       <div class="trip-date">${esc(fmtMonth(t.month))}<small>${esc(t.place || "")}</small></div>
       <div>
@@ -177,7 +176,13 @@ function render() {
           ${photoGrid(t)}
           ${canEdit() ? `<div class="tools">${editBtn("trip", t.id)}${delBtn("trips", t.id)}</div>` : ""}`}
       </div>
-    </li>`).join("") : `<p class="empty">还没有回忆。登录后点「添加一段回忆」，放上第一段。</p>`;
+    </li>`;
+  const ours = data.trips.filter(t => (t.kind || "us") === "us");
+  const klim = data.trips.filter(t => t.kind === "cat");
+  $("#trip-list").innerHTML = ours.length ? ours.map(memory).join("")
+    : `<p class="empty">还没有回忆。登录后点「添加一段回忆」，放上第一段。</p>`;
+  $("#klim-list").innerHTML = klim.length ? klim.map(memory).join("")
+    : `<p class="empty">还没有可莉姆的记录。登录后点「添加一条记录」，放上它的第一张照片。</p>`;
 
   const sl = $("#show-list");
   sl.innerHTML = data.shows.length ? data.shows.map(showItem).join("")
@@ -257,9 +262,9 @@ wire("#login-form", async (fd, status) => {
 });
 
 wire("#trip-form", async (fd, status) => {
-  const { data: trip, error } = await sb.from("trips").insert({
-    title: fd.get("title"), month: fd.get("month") + "-01", place: fd.get("place"), story: fd.get("story"),
-  }).select().single();
+  const row = { title: fd.get("title"), month: fd.get("month") + "-01", place: fd.get("place"), story: fd.get("story") };
+  if (fd.get("kind") === "cat") row.kind = "cat"; // 「我们的回忆」不写 kind，用数据库默认值
+  const { data: trip, error } = await sb.from("trips").insert(row).select().single();
   if (error) throw error;
   const files = fd.getAll("photos").filter(f => f.size);
   for (let i = 0; i < files.length; i++) {
@@ -287,7 +292,15 @@ wire("#note-form", async fd => {
 /* ---------------- clicks ---------------- */
 document.addEventListener("click", async e => {
   const open = e.target.closest("[data-open]");
-  if (open) { $("#" + open.dataset.open).showModal(); return; }
+  if (open) {
+    if (open.dataset.kind) {
+      const cat = open.dataset.kind === "cat";
+      $("#trip-form [name=kind]").value = open.dataset.kind;
+      $("#trip-dialog-title").textContent = cat ? "添加可莉姆的记录" : "添加一段回忆";
+      $("#trip-form [name=title]").placeholder = cat ? "比如：第一次见到可莉姆" : "比如：一起欣赏大足石刻";
+    }
+    $("#" + open.dataset.open).showModal(); return;
+  }
 
   const edit = e.target.closest("[data-edit]");
   if (edit) { const [kind, id] = edit.dataset.edit.split(":"); endEdit(); startEdit(kind, id); return; }
@@ -372,7 +385,7 @@ document.addEventListener("submit", async e => {
     endEdit(); await load(); render();
   } catch (err) {
     console.error(err);
-    const hint = /layout|show_id/.test(err.message || "") ? "（数据库还缺新字段，请先运行更新用的 SQL）" : "";
+    const hint = /layout|show_id|kind/.test(err.message || "") ? "（数据库还缺新字段，请先运行更新用的 SQL）" : "";
     status.textContent = `没有保存成功：${err.message || err}${hint}。`;
     btn.disabled = false;
   }
@@ -380,6 +393,24 @@ document.addEventListener("submit", async e => {
 $("#photo-viewer").addEventListener("click", e => { if (e.target.id === "photo-viewer") e.target.close(); });
 $("#logout-btn").addEventListener("click", async () => { await sb.auth.signOut(); refreshAuth(); });
 sb?.auth.onAuthStateChange(() => refreshAuth());
+
+/* ---------------- pages ---------------- */
+const PAGES = ["trips", "shows", "notes", "klim"];
+function route() {
+  const page = PAGES.includes(location.hash.slice(1)) ? location.hash.slice(1) : "trips";
+  document.querySelectorAll("main > .block").forEach(sec => (sec.hidden = sec.id !== page));
+  document.querySelectorAll(".tabs a").forEach(a => {
+    if (a.getAttribute("href") === "#" + page) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
+  });
+}
+window.addEventListener("hashchange", () => {
+  route();
+  // 切换页面时停在导航栏下面，而不是跳回页面最顶上
+  const nav = $(".tabs");
+  if (nav.getBoundingClientRect().top < 0 || window.scrollY > nav.offsetTop) window.scrollTo({ top: nav.offsetTop });
+});
+route();
 
 await load();
 render();

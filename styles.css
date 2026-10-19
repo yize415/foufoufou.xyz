@@ -65,20 +65,31 @@ button, input, textarea { font: inherit; color: inherit; }
   color: var(--muted);
 }
 .tabs {
-  margin-top: 28px;
-  display: flex; flex-wrap: wrap; gap: 6px 22px;
-}
-.tabs a {
-  color: var(--ink);
-  text-decoration: none;
+  position: sticky; top: 0; z-index: 5;
+  background: var(--lichen);
   border-bottom: 1px solid var(--line);
-  padding-bottom: 2px;
 }
-.tabs a:hover { border-color: var(--iron); color: var(--iron); }
+.tabs-inner {
+  max-width: 1100px; margin: 0 auto;
+  padding: 0 clamp(16px, 6vw, 72px);
+  display: flex; gap: 4px 26px; overflow-x: auto; scrollbar-width: none;
+}
+.tabs-inner::-webkit-scrollbar { display: none; }
+.tabs a {
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 12px 0 10px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tabs a:hover { color: var(--ink); }
+.tabs a[aria-current="page"] { color: var(--ink); font-weight: 700; border-bottom-color: var(--iron); }
 
 /* ---------- Sections ---------- */
 main { max-width: 1100px; margin: 0 auto; padding: 0 clamp(16px, 6vw, 72px); }
-.block { padding: 56px 0 24px; border-top: 1px solid var(--line); }
+.block { padding: 40px 0 24px; min-height: 60vh; }
+.block[hidden] { display: none; }
 .block-head {
   display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
   margin-bottom: 28px;
@@ -238,7 +249,7 @@ main { max-width: 1100px; margin: 0 auto; padding: 0 clamp(16px, 6vw, 72px); }
   color: var(--muted); font-size: 15px;
   display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline;
 }
-#notes { border-bottom: 1px solid var(--line); padding-bottom: 40px; margin-bottom: 24px; }
+.block { border-bottom: 1px solid var(--line); margin-bottom: 24px; }
 .link { background: none; border: 0; padding: 0; color: var(--moss); text-decoration: underline; cursor: pointer; }
 
 /* ---------- Dialogs ---------- */
@@ -275,3 +286,8 @@ input[type=file] { background: transparent; border: 0; padding: 0; }
 .viewer form { padding: 0; position: fixed; top: 12px; right: 16px; }
 .viewer img { max-width: 96vw; max-height: 94vh; border-radius: 3px; }
 .close { background: none; border: 0; color: #fff; font-size: 34px; cursor: pointer; line-height: 1; }
+
+@media (max-width: 480px) {
+  .tabs-inner { gap: 4px 16px; }
+  .tabs a { font-size: 16px; }
+}

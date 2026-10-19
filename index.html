@@ -14,18 +14,22 @@
     <span>foufou</span><span>and seeker’s</span><span>snuggery</span>
   </h1>
   <p class="lede">关于我们的一切</p>
-  <nav class="tabs" aria-label="板块">
+</header>
+
+<nav class="tabs" aria-label="板块">
+  <div class="tabs-inner">
     <a href="#trips">我们的回忆</a>
     <a href="#shows">一起看的剧</a>
     <a href="#notes">想对你说</a>
-  </nav>
-</header>
+    <a href="#klim">可莉姆</a>
+  </div>
+</nav>
 
 <main>
   <section id="trips" class="block">
     <div class="block-head">
       <h2>我们的回忆</h2>
-      <button class="add" data-open="trip-dialog" hidden>添加一段回忆</button>
+      <button class="add" data-open="trip-dialog" data-kind="us" hidden>添加一段回忆</button>
     </div>
     <ol class="timeline" id="trip-list"></ol>
   </section>
@@ -44,6 +48,13 @@
       <button class="add" data-open="note-dialog" hidden>写一句话</button>
     </div>
     <ul class="notes" id="note-list"></ul>
+  </section>
+  <section id="klim" class="block">
+    <div class="block-head">
+      <h2>可莉姆</h2>
+      <button class="add" data-open="trip-dialog" data-kind="cat" hidden>添加一条记录</button>
+    </div>
+    <ol class="timeline" id="klim-list"></ol>
   </section>
 </main>
 
@@ -67,7 +78,8 @@
 <!-- Trip -->
 <dialog id="trip-dialog">
   <form method="dialog" id="trip-form">
-    <h3>添加一段回忆</h3>
+    <h3 id="trip-dialog-title">添加一段回忆</h3>
+    <input type="hidden" name="kind" value="us">
     <label>标题<input name="title" required placeholder="比如：一起欣赏大足石刻"></label>
     <div class="row">
       <label>什么时候<input name="month" type="month" required></label>

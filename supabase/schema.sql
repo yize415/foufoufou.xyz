@@ -33,6 +33,7 @@ create table if not exists public.trips (
   place text,
   story text,
   layout text not null default 'cover',
+  kind text not null default 'us', -- 'us' 我们的回忆，'cat' 可莉姆
   created_at timestamptz not null default now()
 );
 
