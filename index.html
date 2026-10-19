@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>foufoufou</title>
+<meta name="description" content="一起走过的地方，一起看过的剧，想对彼此说的话。">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-screen-webfont@1.7.0/style.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="hero">
+  <h1 class="mark" aria-label="foufoufou">
+    <span>fou</span><span>fou</span><span>fou</span>
+  </h1>
+  <p class="lede">一起走过的地方，一起看过的剧，想对彼此说的话。</p>
+  <nav class="tabs" aria-label="板块">
+    <a href="#trips">旅行</a>
+    <a href="#shows">一起看的剧</a>
+    <a href="#notes">想对你说</a>
+  </nav>
+</header>
+
+<main>
+  <section id="trips" class="block">
+    <div class="block-head">
+      <h2>旅行</h2>
+      <button class="add" data-open="trip-dialog" hidden>添加一次旅行</button>
+    </div>
+    <ol class="timeline" id="trip-list"></ol>
+  </section>
+
+  <section id="shows" class="block">
+    <div class="block-head">
+      <h2>一起看的剧</h2>
+      <button class="add" data-open="show-dialog" hidden>添加一部剧</button>
+    </div>
+    <ul class="shows" id="show-list"></ul>
+  </section>
+
+  <section id="notes" class="block">
+    <div class="block-head">
+      <h2>想对你说</h2>
+      <button class="add" data-open="note-dialog" hidden>写一句话</button>
+    </div>
+    <ul class="notes" id="note-list"></ul>
+  </section>
+</main>
+
+<footer class="foot">
+  <span id="auth-state">只有我们俩可以往这里添加内容。</span>
+  <button class="link" id="login-btn" data-open="login-dialog">登录</button>
+  <button class="link" id="logout-btn" hidden>退出登录</button>
+</footer>
+
+<!-- Login -->
+<dialog id="login-dialog">
+  <form method="dialog" id="login-form">
+    <h3>登录</h3>
+    <p class="hint">输入邮箱，我们会发一个登录链接给你，点开就登录了。</p>
+    <label>邮箱<input type="email" name="email" required autocomplete="email"></label>
+    <p class="status" role="status"></p>
+    <div class="actions"><button value="cancel" formnovalidate class="link">取消</button><button type="submit" class="primary">发送登录链接</button></div>
+  </form>
+</dialog>
+
+<!-- Trip -->
+<dialog id="trip-dialog">
+  <form method="dialog" id="trip-form">
+    <h3>添加一次旅行</h3>
+    <label>去了哪里<input name="title" required placeholder="比如：一起欣赏大足石刻"></label>
+    <div class="row">
+      <label>什么时候<input name="month" type="month" required></label>
+      <label>地点<input name="place" placeholder="比如：重庆大足"></label>
+    </div>
+    <label>想记住的事<textarea name="story" rows="4" placeholder="走错的路，好吃的那顿饭，只有我们知道的小事"></textarea></label>
+    <label>照片<input name="photos" type="file" accept="image/*" multiple></label>
+    <p class="status" role="status"></p>
+    <div class="actions"><button value="cancel" formnovalidate class="link">取消</button><button type="submit" class="primary">保存这次旅行</button></div>
+  </form>
+</dialog>
+
+<!-- Show -->
+<dialog id="show-dialog">
+  <form method="dialog" id="show-form">
+    <h3>添加一部剧</h3>
+    <label>剧名<input name="title" required></label>
+    <div class="row">
+      <label>什么时候看的<input name="watched" placeholder="比如：2026年秋天"></label>
+      <label>在哪看的<input name="where_watched" placeholder="沙发上 / 视频连线"></label>
+    </div>
+    <label>我们怎么评价<textarea name="note" rows="3"></textarea></label>
+    <label>一句台词或梗<input name="quote"></label>
+    <p class="status" role="status"></p>
+    <div class="actions"><button value="cancel" formnovalidate class="link">取消</button><button type="submit" class="primary">保存这部剧</button></div>
+  </form>
+</dialog>
+
+<!-- Note -->
+<dialog id="note-dialog">
+  <form method="dialog" id="note-form">
+    <h3>写一句话</h3>
+    <label>署名<input name="author" required placeholder="你的名字或外号"></label>
+    <label>想说的话<textarea name="body" rows="5" required></textarea></label>
+    <p class="status" role="status"></p>
+    <div class="actions"><button value="cancel" formnovalidate class="link">取消</button><button type="submit" class="primary">留下这句话</button></div>
+  </form>
+</dialog>
+
+<dialog id="photo-viewer" class="viewer">
+  <form method="dialog"><button class="close" aria-label="关闭">×</button></form>
+  <img alt="">
+</dialog>
+
+<script src="config.js"></script>
+<script src="seed.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
