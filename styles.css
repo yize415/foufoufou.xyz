@@ -118,9 +118,9 @@ main { max-width: 1100px; margin: 0 auto; padding: 0 clamp(16px, 6vw, 72px); }
   border: 1px dashed var(--line); border-radius: 4px; background: transparent; color: var(--muted);
 }
 .write:hover { border-color: var(--moss); color: var(--moss); }
-.edit-trip { display: grid; gap: 10px; max-width: var(--measure); margin-bottom: 18px; }
-.edit-trip .edit-title { font-size: clamp(22px, 3vw, 28px); font-weight: 700; }
-.edit-trip textarea { line-height: 1.75; resize: vertical; }
+.edit-form { display: grid; gap: 10px; max-width: var(--measure); margin-bottom: 18px; }
+.edit-form .edit-title { font-size: clamp(22px, 3vw, 28px); font-weight: 700; }
+.edit-form textarea { line-height: 1.75; resize: vertical; }
 .tools { display: flex; gap: 14px; margin-top: 10px; }
 
 /* 排版选择 */
@@ -209,7 +209,14 @@ main { max-width: 1100px; margin: 0 auto; padding: 0 clamp(16px, 6vw, 72px); }
 .show .meta { color: var(--muted); font-size: 15px; }
 .show p { margin: 0; max-width: var(--measure); }
 .show q { display: block; margin-top: 6px; color: var(--moss); quotes: "「" "」"; }
-@media (max-width: 640px) { .show { grid-template-columns: 1fr; } }
+.show-cover { margin-bottom: 10px; max-width: 220px; }
+.show-cover button, .show-thumbs button { padding: 0; border: 0; background: none; cursor: zoom-in; display: block; width: 100%; }
+.show-cover img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 3px; }
+.show-thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin-top: 12px; max-width: var(--measure); }
+.show-thumbs img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 3px; }
+.show-editing { display: block; }
+.edit-show { margin: 0; }
+@media (max-width: 640px) { .show { grid-template-columns: 1fr; } .show-cover { max-width: none; } }
 
 /* ---------- Notes ---------- */
 .notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 22px; }

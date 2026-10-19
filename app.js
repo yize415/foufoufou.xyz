@@ -34,7 +34,7 @@ function photoUrl(path) {
 async function load() {
   if (!sb) { data = structuredClone(window.SEED); return; }
   const [trips, photos, shows, notes] = await Promise.all([
-    sb.from("trips").select("*").order("month", { ascending: false }),
+    sb.from("trips").select("*").order("month", { ascending: false }).order("created_at", { ascending: false }),
     sb.from("photos").select("*").order("sort").order("created_at"),
     sb.from("shows").select("*").order("created_at", { ascending: false }),
     sb.from("notes").select("*").order("created_at", { ascending: false }),
@@ -43,7 +43,7 @@ async function load() {
   if (err) { console.error(err); data = structuredClone(window.SEED); return; }
   data = {
     trips: trips.data.map(t => ({ ...t, photos: photos.data.filter(p => p.trip_id === t.id) })),
-    shows: shows.data,
+    shows: shows.data.map(x => ({ ...x, photos: photos.data.filter(p => p.show_id === x.id) })),
     notes: notes.data,
   };
 }
@@ -66,8 +66,7 @@ function photoGrid(t) {
     </button>`).join("")}</div>`;
 }
 
-function editForm() {
-  const d = draft;
+function photoEditor(d) {
   const thumbs = d.photos.map((p, i) => `
     <li class="pe-item">
       <img src="${esc(p.preview || photoUrl(p.path))}" alt="">
@@ -80,10 +79,23 @@ function editForm() {
       </div>
     </li>`).join("");
   return `
-  <form class="edit-trip" data-id="${esc(d.id)}">
+    <div class="pe">
+      <div class="pe-head">照片顺序<small>第一张是封面。用 ‹ › 调整顺序。</small></div>
+      ${d.photos.length ? `<ol class="pe-list">${thumbs}</ol>` : `<p class="empty">还没有照片。</p>`}
+      <label class="pe-add">添加照片<input type="file" accept="image/*" multiple data-add-photos></label>
+    </div>`;
+}
+
+const editActions = `
+    <p class="status" role="status"></p>
+    <div class="actions"><button type="button" class="link" data-cancel-edit>取消</button><button type="submit" class="primary">保存</button></div>`;
+
+function tripEditForm() {
+  const d = draft;
+  return `
+  <form class="edit-form">
     <input name="title" value="${esc(d.title)}" required aria-label="标题" class="edit-title">
     <textarea name="story" rows="8" aria-label="正文" placeholder="写下这段回忆…">${esc(d.story)}</textarea>
-
     <fieldset class="layout-pick">
       <legend>照片排版</legend>
       ${LAYOUTS.map(([v, name, desc]) => `
@@ -93,28 +105,63 @@ function editForm() {
           <span><b>${name}</b><small>${desc}</small></span>
         </label>`).join("")}
     </fieldset>
-
-    <div class="pe">
-      <div class="pe-head">照片顺序<small>第一张是封面。用 ‹ › 调整顺序。</small></div>
-      ${d.photos.length ? `<ol class="pe-list">${thumbs}</ol>` : `<p class="empty">还没有照片。</p>`}
-      <label class="pe-add">添加照片<input type="file" accept="image/*" multiple data-add-photos></label>
-    </div>
-
-    <p class="status" role="status"></p>
-    <div class="actions"><button type="button" class="link" data-cancel-edit>取消</button><button type="submit" class="primary">保存</button></div>
+    ${photoEditor(d)}
+    ${editActions}
   </form>`;
 }
 
-function startEdit(id) {
-  const t = data.trips.find(x => x.id === id);
-  draft = { id, title: t.title, story: t.story || "", layout: t.layout || "cover", photos: t.photos.map(p => ({ ...p })), removed: [] };
+function showEditForm() {
+  const d = draft;
+  return `
+  <form class="edit-form edit-show">
+    <label>剧名<input name="title" value="${esc(d.title)}" required class="edit-title"></label>
+    <div class="row">
+      <label>什么时候看的<input name="watched" value="${esc(d.watched)}" placeholder="比如：2026年秋天"></label>
+      <label>在哪看的<input name="where_watched" value="${esc(d.where_watched)}" placeholder="沙发上 / 视频连线"></label>
+    </div>
+    <label>我们怎么评价<textarea name="note" rows="4">${esc(d.note)}</textarea></label>
+    <label>一句台词或梗<input name="quote" value="${esc(d.quote)}"></label>
+    ${photoEditor(d)}
+    ${editActions}
+  </form>`;
+}
+
+const DRAFT_FIELDS = { trip: ["title", "story", "layout"], show: ["title", "watched", "where_watched", "note", "quote"] };
+
+function startEdit(kind, id) {
+  const src = (kind === "trip" ? data.trips : data.shows).find(x => x.id === id);
+  draft = { kind, id, photos: src.photos.map(p => ({ ...p })), removed: [] };
+  for (const f of DRAFT_FIELDS[kind]) draft[f] = src[f] || "";
+  if (kind === "trip") draft.layout ||= "cover";
   render();
-  document.querySelector(".edit-trip textarea")?.focus();
+  document.querySelector(".edit-form textarea")?.focus();
 }
 
 function endEdit() {
   draft?.photos.forEach(p => p.preview && URL.revokeObjectURL(p.preview));
   draft = null;
+}
+
+const editing = (kind, id) => draft?.kind === kind && draft.id === id;
+const editBtn = (kind, id) => `<button class="del" data-edit="${kind}:${esc(id)}">编辑</button>`;
+
+function showItem(x) {
+  if (editing("show", x.id)) return `<li class="show show-editing">${showEditForm()}</li>`;
+  const [cover, ...rest] = x.photos || [];
+  const img = p => `<button data-view="${esc(photoUrl(p.path))}" aria-label="查看大图"><img src="${esc(photoUrl(p.path))}" alt="${esc(x.title)}" loading="lazy"></button>`;
+  return `
+    <li class="show">
+      <div class="show-side">
+        ${cover ? `<div class="show-cover">${img(cover)}</div>` : ""}
+        <h3>${esc(x.title)}</h3>
+        <div class="meta">${esc([x.watched, x.where_watched].filter(Boolean).join("，"))}</div>
+      </div>
+      <div>
+        ${x.note ? `<p>${esc(x.note)}</p>` : ""}${x.quote ? `<q>${esc(x.quote)}</q>` : ""}
+        ${rest.length ? `<div class="show-thumbs">${rest.map(img).join("")}</div>` : ""}
+        ${canEdit() ? `<div class="tools">${editBtn("show", x.id)}${delBtn("shows", x.id)}</div>` : ""}
+      </div>
+    </li>`;
 }
 
 function render() {
@@ -123,21 +170,18 @@ function render() {
     <li class="trip">
       <div class="trip-date">${esc(fmtMonth(t.month))}<small>${esc(t.place || "")}</small></div>
       <div>
-        ${draft?.id === t.id ? editForm() : `
+        ${editing("trip", t.id) ? tripEditForm() : `
           <h3>${esc(t.title)}</h3>
           ${t.story ? `<p class="story">${esc(t.story)}</p>`
-            : canEdit() ? `<button class="write" data-edit="${esc(t.id)}">写点什么…</button>` : ""}
+            : canEdit() ? `<button class="write" data-edit="trip:${esc(t.id)}">写点什么…</button>` : ""}
           ${photoGrid(t)}
-          ${canEdit() ? `<div class="tools"><button class="del" data-edit="${esc(t.id)}">编辑</button>${delBtn("trips", t.id)}</div>` : ""}`}
+          ${canEdit() ? `<div class="tools">${editBtn("trip", t.id)}${delBtn("trips", t.id)}</div>` : ""}`}
       </div>
     </li>`).join("") : `<p class="empty">还没有回忆。登录后点「添加一段回忆」，放上第一段。</p>`;
 
   const sl = $("#show-list");
-  sl.innerHTML = data.shows.length ? data.shows.map(s => `
-    <li class="show">
-      <div><h3>${esc(s.title)}</h3><div class="meta">${esc([s.watched, s.where_watched].filter(Boolean).join("，"))}</div></div>
-      <div>${s.note ? `<p>${esc(s.note)}</p>` : ""}${s.quote ? `<q>${esc(s.quote)}</q>` : ""}${delBtn("shows", s.id)}</div>
-    </li>`).join("") : `<p class="empty">还没有记下一起看的剧。看完一部，就来添上它。</p>`;
+  sl.innerHTML = data.shows.length ? data.shows.map(showItem).join("")
+    : `<p class="empty">还没有记下一起看的剧。看完一部，就来添上它。</p>`;
 
   const nl = $("#note-list");
   nl.innerHTML = data.notes.length ? data.notes.map(n => `
@@ -175,12 +219,14 @@ async function shrink(file, max = 2000, quality = 0.85) {
   return new Promise(r => c.toBlob(r, "image/jpeg", quality));
 }
 
-async function uploadPhoto(tripId, file, sort) {
+// owner 是 { trip_id } 或 { show_id }
+async function uploadPhoto(owner, file, sort) {
   const blob = await shrink(file);
-  const path = `${tripId}/${crypto.randomUUID()}.jpg`;
+  const folder = owner.show_id ? `shows/${owner.show_id}` : owner.trip_id;
+  const path = `${folder}/${crypto.randomUUID()}.jpg`;
   const up = await sb.storage.from(cfg.photoBucket).upload(path, blob, { contentType: "image/jpeg" });
   if (up.error) throw up.error;
-  const ins = await sb.from("photos").insert({ trip_id: tripId, path, sort });
+  const ins = await sb.from("photos").insert({ ...owner, path, sort });
   if (ins.error) throw ins.error;
 }
 const isLocalAsset = path => /^(https?:|assets\/)/.test(path);
@@ -218,13 +264,19 @@ wire("#trip-form", async (fd, status) => {
   const files = fd.getAll("photos").filter(f => f.size);
   for (let i = 0; i < files.length; i++) {
     status.textContent = `正在上传照片 ${i + 1}/${files.length}…`;
-    await uploadPhoto(trip.id, files[i], i);
+    await uploadPhoto({ trip_id: trip.id }, files[i], i);
   }
 });
 
-wire("#show-form", async fd => {
-  const { error } = await sb.from("shows").insert(Object.fromEntries(["title", "watched", "where_watched", "note", "quote"].map(k => [k, fd.get(k)])));
+wire("#show-form", async (fd, status) => {
+  const { data: show, error } = await sb.from("shows")
+    .insert(Object.fromEntries(DRAFT_FIELDS.show.map(k => [k, fd.get(k)]))).select().single();
   if (error) throw error;
+  const files = fd.getAll("photos").filter(f => f.size);
+  for (let i = 0; i < files.length; i++) {
+    status.textContent = `正在上传图片 ${i + 1}/${files.length}…`;
+    await uploadPhoto({ show_id: show.id }, files[i], i);
+  }
 });
 
 wire("#note-form", async fd => {
@@ -238,7 +290,7 @@ document.addEventListener("click", async e => {
   if (open) { $("#" + open.dataset.open).showModal(); return; }
 
   const edit = e.target.closest("[data-edit]");
-  if (edit) { endEdit(); startEdit(edit.dataset.edit); return; }
+  if (edit) { const [kind, id] = edit.dataset.edit.split(":"); endEdit(); startEdit(kind, id); return; }
   if (e.target.closest("[data-cancel-edit]")) { endEdit(); render(); return; }
 
   if (draft) {
@@ -261,9 +313,9 @@ document.addEventListener("click", async e => {
   const del = e.target.closest("[data-del]");
   if (del && confirm("确定删除吗？删除后找不回来。")) {
     const table = del.dataset.del, id = del.dataset.id;
-    if (table === "trips") {
-      const t = data.trips.find(x => x.id === id);
-      const paths = (t?.photos || []).map(p => p.path).filter(p => !/^(https?:|assets\/)/.test(p));
+    if (table === "trips" || table === "shows") {
+      const item = data[table].find(x => x.id === id);
+      const paths = (item?.photos || []).map(p => p.path).filter(p => !isLocalAsset(p));
       if (paths.length) await sb.storage.from(cfg.photoBucket).remove(paths);
     }
     const { error } = await sb.from(table).delete().eq("id", id);
@@ -273,13 +325,13 @@ document.addEventListener("click", async e => {
 });
 // 编辑时把输入的文字和排版存进 draft，这样调整照片顺序时不会丢掉正在写的内容
 document.addEventListener("input", e => {
-  if (!draft || !e.target.closest(".edit-trip")) return;
+  if (!draft || !e.target.closest(".edit-form")) return;
   const { name, value } = e.target;
-  if (name === "title" || name === "story") draft[name] = value;
+  if (DRAFT_FIELDS[draft.kind].includes(name) && name !== "layout") draft[name] = value;
 });
 document.addEventListener("change", e => {
   if (!draft) return;
-  if (e.target.name === "layout" && e.target.closest(".edit-trip")) draft.layout = e.target.value;
+  if (e.target.name === "layout" && e.target.closest(".edit-form")) draft.layout = e.target.value;
   if (e.target.matches("[data-add-photos]")) {
     for (const file of e.target.files) draft.photos.push({ file, preview: URL.createObjectURL(file) });
     render();
@@ -287,14 +339,16 @@ document.addEventListener("change", e => {
 });
 
 document.addEventListener("submit", async e => {
-  const form = e.target.closest(".edit-trip");
+  const form = e.target.closest(".edit-form");
   if (!form) return;
   e.preventDefault();
   const btn = form.querySelector(".primary"), status = form.querySelector(".status");
   btn.disabled = true;
   try {
     const d = draft;
-    const up = await sb.from("trips").update({ title: d.title, story: d.story, layout: d.layout }).eq("id", d.id);
+    const table = d.kind === "trip" ? "trips" : "shows";
+    const owner = d.kind === "trip" ? { trip_id: d.id } : { show_id: d.id };
+    const up = await sb.from(table).update(Object.fromEntries(DRAFT_FIELDS[d.kind].map(f => [f, d[f]]))).eq("id", d.id);
     if (up.error) throw up.error;
 
     for (const p of d.removed) {
@@ -309,7 +363,7 @@ document.addEventListener("submit", async e => {
       const p = d.photos[i];
       if (p.file) {
         status.textContent = `正在上传照片 ${++uploaded}/${newCount}…`;
-        await uploadPhoto(d.id, p.file, i);
+        await uploadPhoto(owner, p.file, i);
       } else if (p.sort !== i) {
         const r = await sb.from("photos").update({ sort: i }).eq("id", p.id);
         if (r.error) throw r.error;
@@ -318,7 +372,7 @@ document.addEventListener("submit", async e => {
     endEdit(); await load(); render();
   } catch (err) {
     console.error(err);
-    const hint = /layout/.test(err.message || "") ? "（数据库还没有排版这一项，请先运行更新用的 SQL）" : "";
+    const hint = /layout|show_id/.test(err.message || "") ? "（数据库还缺新字段，请先运行更新用的 SQL）" : "";
     status.textContent = `没有保存成功：${err.message || err}${hint}。`;
     btn.disabled = false;
   }

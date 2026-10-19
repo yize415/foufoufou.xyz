@@ -36,15 +36,6 @@ create table if not exists public.trips (
   created_at timestamptz not null default now()
 );
 
-create table if not exists public.photos (
-  id uuid primary key default gen_random_uuid(),
-  trip_id uuid not null references public.trips(id) on delete cascade,
-  path text not null,
-  caption text,
-  sort int not null default 0,
-  created_at timestamptz not null default now()
-);
-
 create table if not exists public.shows (
   id uuid primary key default gen_random_uuid(),
   title text not null,
@@ -53,6 +44,17 @@ create table if not exists public.shows (
   note text,
   quote text,
   created_at timestamptz not null default now()
+);
+
+create table if not exists public.photos (
+  id uuid primary key default gen_random_uuid(),
+  trip_id uuid references public.trips(id) on delete cascade,
+  show_id uuid references public.shows(id) on delete cascade,
+  path text not null,
+  caption text,
+  sort int not null default 0,
+  created_at timestamptz not null default now(),
+  constraint photos_one_owner check (num_nonnulls(trip_id, show_id) = 1)
 );
 
 create table if not exists public.notes (
