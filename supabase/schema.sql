@@ -32,6 +32,7 @@ create table if not exists public.trips (
   month date not null,
   place text,
   story text,
+  layout text not null default 'cover',
   created_at timestamptz not null default now()
 );
 
