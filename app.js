@@ -178,10 +178,10 @@ function render() {
       </div>
     </li>`;
   const ours = data.trips.filter(t => (t.kind || "us") === "us");
-  const klim = data.trips.filter(t => t.kind === "cat");
+  const cream = data.trips.filter(t => t.kind === "cat");
   $("#trip-list").innerHTML = ours.length ? ours.map(memory).join("")
     : `<p class="empty">还没有回忆。登录后点「添加一段回忆」，放上第一段。</p>`;
-  $("#klim-list").innerHTML = klim.length ? klim.map(memory).join("")
+  $("#cream-list").innerHTML = cream.length ? cream.map(memory).join("")
     : `<p class="empty">还没有可莉姆的记录。登录后点「添加一条记录」，放上它的第一张照片。</p>`;
 
   const sl = $("#show-list");
@@ -395,8 +395,9 @@ $("#logout-btn").addEventListener("click", async () => { await sb.auth.signOut()
 sb?.auth.onAuthStateChange(() => refreshAuth());
 
 /* ---------------- pages ---------------- */
-const PAGES = ["trips", "shows", "notes", "klim"];
+const PAGES = ["trips", "shows", "notes", "cream"];
 function route() {
+  if (location.hash === "#klim") history.replaceState(null, "", "#cream"); // 旧链接
   const page = PAGES.includes(location.hash.slice(1)) ? location.hash.slice(1) : "trips";
   document.querySelectorAll("main > .block").forEach(sec => (sec.hidden = sec.id !== page));
   document.querySelectorAll(".tabs a").forEach(a => {
