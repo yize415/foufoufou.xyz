@@ -3,8 +3,12 @@ const hasDb = Boolean(cfg.supabaseUrl && cfg.supabaseAnonKey);
 
 let sb = null;
 if (hasDb) {
-  const { createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");
-  sb = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+  try {
+    const { createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");
+    sb = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+  } catch (err) {
+    console.error("Supabase failed to load, showing local content", err);
+  }
 }
 
 const $ = (s, el = document) => el.querySelector(s);

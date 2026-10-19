@@ -37,18 +37,19 @@ button, input, textarea { font: inherit; color: inherit; }
 .mark {
   margin: 0;
   font-weight: 700;
-  font-size: clamp(76px, 19vw, 210px);
-  line-height: .82;
+  font-size: clamp(46px, 11vw, 128px);
+  line-height: .9;
+  white-space: nowrap;
   letter-spacing: -.02em;
   display: flex;
   flex-direction: column;
 }
 .mark span:nth-child(1) { color: var(--ink); }
-.mark span:nth-child(2) { color: var(--moss); padding-left: .5em; }
+.mark span:nth-child(2) { color: var(--moss); padding-left: .4em; }
 .mark span:nth-child(3) {
   color: transparent;
   -webkit-text-stroke: 1.5px var(--moss);
-  padding-left: 1em;
+  padding-left: .8em;
 }
 .mark span { opacity: 0; animation: carve .9s ease-out forwards; }
 .mark span:nth-child(2) { animation-delay: .25s; }
@@ -56,8 +57,9 @@ button, input, textarea { font: inherit; color: inherit; }
 @keyframes carve { from { opacity: 0; filter: blur(6px); } to { opacity: 1; filter: none; } }
 @media (prefers-reduced-motion: reduce) { .mark span { animation: none; opacity: 1; } }
 
+@media (max-width: 640px) { .mark span:nth-child(3) { -webkit-text-stroke-width: 1px; } }
 .lede {
-  margin: 28px 0 0;
+  margin: 36px 0 0;
   max-width: var(--measure);
   font-size: clamp(18px, 2.4vw, 22px);
   color: var(--muted);
