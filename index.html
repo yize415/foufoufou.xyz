@@ -15,7 +15,7 @@
   </h1>
   <p class="lede">关于我们的一切</p>
   <nav class="tabs" aria-label="板块">
-    <a href="#trips">旅行</a>
+    <a href="#trips">共同回忆</a>
     <a href="#shows">一起看的剧</a>
     <a href="#notes">想对你说</a>
   </nav>
@@ -24,8 +24,8 @@
 <main>
   <section id="trips" class="block">
     <div class="block-head">
-      <h2>旅行</h2>
-      <button class="add" data-open="trip-dialog" hidden>添加一次旅行</button>
+      <h2>共同回忆</h2>
+      <button class="add" data-open="trip-dialog" hidden>添加一段回忆</button>
     </div>
     <ol class="timeline" id="trip-list"></ol>
   </section>
@@ -67,16 +67,16 @@
 <!-- Trip -->
 <dialog id="trip-dialog">
   <form method="dialog" id="trip-form">
-    <h3>添加一次旅行</h3>
-    <label>去了哪里<input name="title" required placeholder="比如：一起欣赏大足石刻"></label>
+    <h3>添加一段回忆</h3>
+    <label>标题<input name="title" required placeholder="比如：一起欣赏大足石刻"></label>
     <div class="row">
       <label>什么时候<input name="month" type="month" required></label>
-      <label>地点<input name="place" placeholder="比如：重庆大足"></label>
+      <label>在哪里<input name="place" placeholder="比如：重庆大足"></label>
     </div>
-    <label>想记住的事<textarea name="story" rows="4" placeholder="走错的路，好吃的那顿饭，只有我们知道的小事"></textarea></label>
+    <label>正文<textarea name="story" rows="6" placeholder="走错的路，好吃的那顿饭，只有我们知道的小事"></textarea></label>
     <label>照片<input name="photos" type="file" accept="image/*" multiple></label>
     <p class="status" role="status"></p>
-    <div class="actions"><button value="cancel" formnovalidate class="link">取消</button><button type="submit" class="primary">保存这次旅行</button></div>
+    <div class="actions"><button value="cancel" formnovalidate class="link">取消</button><button type="submit" class="primary">保存这段回忆</button></div>
   </form>
 </dialog>
 

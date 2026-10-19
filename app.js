@@ -15,6 +15,7 @@ const $ = (s, el = document) => el.querySelector(s);
 const esc = (s = "") => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 let isMember = false;
+let editingTrip = null;
 let data = { trips: [], shows: [], notes: [] };
 
 /* ---------------- data ---------------- */
@@ -46,6 +47,7 @@ function fmtMonth(m) {
   const [y, mo] = m.slice(0, 7).split("-");
   return `${y}年${Number(mo)}月`;
 }
+const canEdit = () => isMember && Boolean(sb);
 const delBtn = (table, id) => isMember && sb ? `<button class="del" data-del="${table}" data-id="${esc(id)}">删除</button>` : "";
 
 function render() {
@@ -54,15 +56,23 @@ function render() {
     <li class="trip">
       <div class="trip-date">${esc(fmtMonth(t.month))}<small>${esc(t.place || "")}</small></div>
       <div>
-        <h3>${esc(t.title)}</h3>
-        ${t.story ? `<p class="story">${esc(t.story)}</p>` : ""}
+        ${editingTrip === t.id ? `
+          <form class="edit-trip" data-id="${esc(t.id)}">
+            <input name="title" value="${esc(t.title)}" required aria-label="标题" class="edit-title">
+            <textarea name="story" rows="8" aria-label="正文" placeholder="写下这段回忆…">${esc(t.story || "")}</textarea>
+            <p class="status" role="status"></p>
+            <div class="actions"><button type="button" class="link" data-cancel-edit>取消</button><button type="submit" class="primary">保存</button></div>
+          </form>` : `
+          <h3>${esc(t.title)}</h3>
+          ${t.story ? `<p class="story">${esc(t.story)}</p>`
+            : canEdit() ? `<button class="write" data-edit="${esc(t.id)}">写点什么…</button>` : ""}`}
         ${t.photos?.length ? `<div class="photos">${t.photos.map(p => `
           <button data-view="${esc(photoUrl(p.path))}" aria-label="查看大图">
             <img src="${esc(photoUrl(p.path))}" alt="${esc(p.caption || t.title)}" loading="lazy">
           </button>`).join("")}</div>` : ""}
-        ${delBtn("trips", t.id)}
+        ${canEdit() && editingTrip !== t.id ? `<div class="tools">${t.story ? `<button class="del" data-edit="${esc(t.id)}">编辑</button>` : ""}${delBtn("trips", t.id)}</div>` : ""}
       </div>
-    </li>`).join("") : `<p class="empty">还没有旅行。登录后点「添加一次旅行」，放上第一段回忆。</p>`;
+    </li>`).join("") : `<p class="empty">还没有回忆。登录后点「添加一段回忆」，放上第一段。</p>`;
 
   const sl = $("#show-list");
   sl.innerHTML = data.shows.length ? data.shows.map(s => `
@@ -164,6 +174,10 @@ document.addEventListener("click", async e => {
   const open = e.target.closest("[data-open]");
   if (open) { $("#" + open.dataset.open).showModal(); return; }
 
+  const edit = e.target.closest("[data-edit]");
+  if (edit) { editingTrip = edit.dataset.edit; render(); document.querySelector(".edit-trip textarea")?.focus(); return; }
+  if (e.target.closest("[data-cancel-edit]")) { editingTrip = null; render(); return; }
+
   const view = e.target.closest("[data-view]");
   if (view) { const d = $("#photo-viewer"); $("img", d).src = view.dataset.view; d.showModal(); return; }
 
@@ -179,6 +193,17 @@ document.addEventListener("click", async e => {
     if (error) alert("删除失败：" + error.message);
     await load(); render();
   }
+});
+document.addEventListener("submit", async e => {
+  const form = e.target.closest(".edit-trip");
+  if (!form) return;
+  e.preventDefault();
+  const btn = form.querySelector(".primary"), status = form.querySelector(".status");
+  btn.disabled = true;
+  const fd = new FormData(form);
+  const { error } = await sb.from("trips").update({ title: fd.get("title"), story: fd.get("story") }).eq("id", form.dataset.id);
+  if (error) { status.textContent = `没有保存成功：${error.message}。请稍后再试。`; btn.disabled = false; return; }
+  editingTrip = null; await load(); render();
 });
 $("#photo-viewer").addEventListener("click", e => { if (e.target.id === "photo-viewer") e.target.close(); });
 $("#logout-btn").addEventListener("click", async () => { await sb.auth.signOut(); refreshAuth(); });
