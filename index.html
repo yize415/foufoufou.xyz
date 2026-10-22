@@ -6,6 +6,9 @@
 <title>foufou and seeker's snuggery</title>
 <meta name="description" content="关于我们的一切。">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-screen-webfont@1.7.0/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Ms+Madi&display=swap">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -21,6 +24,7 @@
     <a href="#trips">我们的回忆</a>
     <a href="#shows">看剧</a>
     <a href="#notes">想说</a>
+    <a href="#todos">想做的事</a>
     <a href="#cream">可莉姆的家</a>
   </div>
 </nav>
@@ -49,6 +53,28 @@
     </div>
     <ul class="notes" id="note-list"></ul>
   </section>
+
+  <section id="todos" class="block">
+    <div class="block-head">
+      <h2>想做的事</h2>
+    </div>
+    <div class="sky" id="sky">
+      <canvas id="sky-canvas" aria-hidden="true"></canvas>
+      <p class="sky-empty" id="sky-empty" hidden>天上还空着，想到要一起做的事就放上来。</p>
+      <button class="sky-more" id="sky-more" aria-label="设置" aria-expanded="false" hidden><i></i><i></i><i></i></button>
+      <div class="sky-settings" id="sky-settings" hidden></div>
+      <form class="sky-add" id="sky-add" hidden>
+        <input name="title" required maxlength="40" placeholder="想一起做的事" aria-label="想一起做的事">
+        <button type="submit">放上去</button>
+      </form>
+    </div>
+    <ul class="sr-only" id="todo-sr" aria-label="想做的事"></ul>
+    <div class="done" id="done" hidden>
+      <h3>做过的事</h3>
+      <ol class="done-list" id="done-list"></ol>
+    </div>
+  </section>
+
   <section id="cream" class="block">
     <div class="block-head">
       <h2>可莉姆的家</h2>
@@ -119,6 +145,8 @@
     <div class="actions"><button value="cancel" formnovalidate class="link">取消</button><button type="submit" class="primary">留下这句话</button></div>
   </form>
 </dialog>
+
+<dialog id="todo-window" class="todo-window" aria-label="想做的事"></dialog>
 
 <dialog id="photo-viewer" class="viewer">
   <form method="dialog"><button class="close" aria-label="关闭">×</button></form>

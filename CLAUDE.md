@@ -16,7 +16,9 @@
 - `trips`：回忆。`kind = 'us'` 显示在「我们的回忆」，`kind = 'cat'` 显示在「可莉姆的家」。字段有 `month`（date，取每月 1 号）、`place`、`story`（正文）、`layout`（照片排版：`cover`、`cover-full`、`grid`、`natural`）。
 - `shows`：看剧。字段有 `title`、`watched`、`where_watched`、`note`、`quote`。
 - `notes`：想说。字段有 `author`、`body`。
-- `photos`：照片。`trip_id` 和 `show_id` 两者恰好填一个。`sort` 决定顺序，`sort = 0` 是封面。`path` 以 `assets/` 开头的照片存在仓库里，其余的存在存储桶里。
+- `todos`：想做的事。字段有 `title`、`done_at`（空着是还想做的，填了时间就收进「做过的事」）。
+- `site_settings`：网站设置，`key` + `value`（jsonb）。`todo_canvas` 存「想做的事」页面的气泡和粒子参数。
+- `photos`：照片。`trip_id`、`show_id`、`todo_id` 三者恰好填一个。`sort` 决定顺序，`sort = 0` 是封面。`path` 以 `assets/` 开头的照片存在仓库里，其余的存在存储桶里。
 - 照片在浏览器里压缩（长边 2000px，JPEG 0.85），重绘到 canvas 时会去掉 GPS 等信息。新上传照片的代码要保留这一步。
 
 ## 改数据库的规矩
@@ -27,12 +29,14 @@ Claude 连不上 Supabase，数据库改动要由我们手动运行：
 4. 在回复里把要运行的 SQL 直接贴出来，告诉我们去 Supabase → SQL Editor → New query 粘贴运行。**先运行 SQL，再推代码**，否则网站会报错。
 
 ## 页面
-- 顶部导航是四个标签：我们的回忆（`#trips`）、看剧（`#shows`）、想说（`#notes`）、可莉姆的家（`#cream`）。每个 `main > section.block` 是一个页面，由 `app.js` 里的 `PAGES` 和 `route()` 控制显示哪个。加新页面时要同时改 `index.html` 的导航、新的 `section` 和 `PAGES`。
+- 顶部导航是五个标签：我们的回忆（`#trips`）、看剧（`#shows`）、想说（`#notes`）、想做的事（`#todos`）、可莉姆的家（`#cream`）。每个 `main > section.block` 是一个页面，由 `app.js` 里的 `PAGES` 和 `route()` 控制显示哪个。加新页面时要同时改 `index.html` 的导航、新的 `section` 和 `PAGES`。
 - 编辑状态统一用 `draft` 对象（`kind` 是 `trip` 或 `show`）。照片排序和封面编辑共用 `photoEditor()`，保存时统一走 `.edit-form` 的 submit。
 - 只有 `canEdit()` 为真时才显示添加、编辑、删除按钮。
+- 「想做的事」是一块画布：`sky.js` 只管画气泡、云和粒子，读写数据库在 `app.js` 的「想做的事」部分。点开气泡的窗口是 `#todo-window`。右上角三个点的设置面板只有登录后才显示，调好的参数存进 `site_settings`。
 
 ## 设计
 - 配色取自大足石刻照片里的石墙、青苔和锈铁。颜色只用 `styles.css` 里 `:root` 定义的变量，不要另加新颜色。锈红 `--iron` 只用来标日期和当前标签。
+- 「想做的事」这一页是例外：浅蓝天空和白云，颜色变量只在 `#todos` 和 `.todo-window` 里定义；中文用马善政毛笔体（Ma Shan Zheng），英文用 Ms Madi。其它页面仍按上面的规矩。
 - 字体是霞鹜文楷（LXGW WenKai Screen）。标题「foufou / and seeker's / snuggery」分三行，一行比一行淡，最后一行只保留轮廓，这是网站的标志，不要改动。
 - 每次改动都要在手机宽度（390px）下检查，整个页面不能出现横向滚动。
 - 文案是中文，口吻温柔、简短，不用感叹号堆砌，也不加 emoji。

@@ -1,3 +1,5 @@
+import { Sky, DEFAULTS, PARAMS, imageCloud } from "./sky.js";
+
 const cfg = window.SITE_CONFIG || {};
 const hasDb = Boolean(cfg.supabaseUrl && cfg.supabaseAnonKey);
 
@@ -23,7 +25,7 @@ const LAYOUTS = [
   ["grid", "方格平铺", "所有照片一样大的方块"],
   ["natural", "原比例拼贴", "每张都保持原比例，两列错落排开"],
 ];
-let data = { trips: [], shows: [], notes: [] };
+let data = { trips: [], shows: [], notes: [], todos: [], settings: {} };
 
 /* ---------------- data ---------------- */
 function photoUrl(path) {
@@ -32,12 +34,20 @@ function photoUrl(path) {
 }
 
 async function load() {
+  await fetchData();
+  // 设置面板里正在调的数值，不被重新读取的数据盖掉
+  if (!settingsTouched) sky.setConfig(data.settings.todo_canvas || {});
+}
+
+async function fetchData() {
   if (!sb) { data = structuredClone(window.SEED); return; }
-  const [trips, photos, shows, notes] = await Promise.all([
+  const [trips, photos, shows, notes, todos, settings] = await Promise.all([
     sb.from("trips").select("*").order("month", { ascending: false }).order("created_at", { ascending: false }),
     sb.from("photos").select("*").order("sort").order("created_at"),
     sb.from("shows").select("*").order("created_at", { ascending: false }),
     sb.from("notes").select("*").order("created_at", { ascending: false }),
+    sb.from("todos").select("*").order("created_at"),
+    sb.from("site_settings").select("*"),
   ]);
   const err = trips.error || photos.error || shows.error || notes.error;
   if (err) { console.error(err); data = structuredClone(window.SEED); return; }
@@ -45,7 +55,11 @@ async function load() {
     trips: trips.data.map(t => ({ ...t, photos: photos.data.filter(p => p.trip_id === t.id) })),
     shows: shows.data.map(x => ({ ...x, photos: photos.data.filter(p => p.show_id === x.id) })),
     notes: notes.data,
+    // 「想做的事」的表还没建好时，不影响其它页面
+    todos: todos.error ? [] : todos.data.map(x => ({ ...x, photos: photos.data.filter(p => p.todo_id === x.id) })),
+    settings: Object.fromEntries((settings.data || []).map(x => [x.key, x.value])),
   };
+  if (todos.error) console.warn("todos", todos.error);
 }
 
 /* ---------------- render ---------------- */
@@ -194,6 +208,7 @@ function render() {
     : `<p class="empty">这里留给想对彼此说的话。</p>`;
 
   document.querySelectorAll(".add").forEach(b => (b.hidden = !(isMember && sb)));
+  renderTodos();
 }
 
 /* ---------------- auth ---------------- */
@@ -224,10 +239,10 @@ async function shrink(file, max = 2000, quality = 0.85) {
   return new Promise(r => c.toBlob(r, "image/jpeg", quality));
 }
 
-// owner 是 { trip_id } 或 { show_id }
+// owner 是 { trip_id }、{ show_id } 或 { todo_id }
 async function uploadPhoto(owner, file, sort) {
   const blob = await shrink(file);
-  const folder = owner.show_id ? `shows/${owner.show_id}` : owner.trip_id;
+  const folder = owner.show_id ? `shows/${owner.show_id}` : owner.todo_id ? `todos/${owner.todo_id}` : owner.trip_id;
   const path = `${folder}/${crypto.randomUUID()}.jpg`;
   const up = await sb.storage.from(cfg.photoBucket).upload(path, blob, { contentType: "image/jpeg" });
   if (up.error) throw up.error;
@@ -291,6 +306,7 @@ wire("#note-form", async fd => {
 
 /* ---------------- clicks ---------------- */
 document.addEventListener("click", async e => {
+  if (todoClick(e)) return;
   const open = e.target.closest("[data-open]");
   if (open) {
     if (open.dataset.kind) {
@@ -326,13 +342,14 @@ document.addEventListener("click", async e => {
   const del = e.target.closest("[data-del]");
   if (del && confirm("确定删除吗？删除后找不回来。")) {
     const table = del.dataset.del, id = del.dataset.id;
-    if (table === "trips" || table === "shows") {
+    if (table === "trips" || table === "shows" || table === "todos") {
       const item = data[table].find(x => x.id === id);
       const paths = (item?.photos || []).map(p => p.path).filter(p => !isLocalAsset(p));
       if (paths.length) await sb.storage.from(cfg.photoBucket).remove(paths);
     }
     const { error } = await sb.from(table).delete().eq("id", id);
     if (error) alert("删除失败：" + error.message);
+    else if (table === "todos" && id === openId) closeTodo();
     await load(); render();
   }
 });
@@ -394,12 +411,207 @@ $("#photo-viewer").addEventListener("click", e => { if (e.target.id === "photo-v
 $("#logout-btn").addEventListener("click", async () => { await sb.auth.signOut(); refreshAuth(); });
 sb?.auth.onAuthStateChange(() => refreshAuth());
 
+/* ---------------- 想做的事 ---------------- */
+const sky = new Sky($("#sky"), $("#sky-canvas"), { onOpen: (id, at) => openTodo(id, at) });
+const motionOK = () => !matchMedia("(prefers-reduced-motion: reduce)").matches;
+let openId = null, cloudFx = null, settingsTouched = false;
+const todoImage = t => t.photos?.[0] ? photoUrl(t.photos[0].path) : null;
+const fmtDay = ts => new Date(ts).toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" });
+
+function renderTodos() {
+  const active = data.todos.filter(t => !t.done_at);
+  const done = data.todos.filter(t => t.done_at).sort((a, b) => b.done_at.localeCompare(a.done_at));
+  sky.setInset(canEdit() ? 72 : 0);
+  sky.setTodos(active.map(t => ({ id: t.id, title: t.title, image: todoImage(t) })));
+  $("#sky-empty").hidden = active.length > 0;
+  // 给读屏软件和键盘用的清单，画布本身读不出来
+  $("#todo-sr").innerHTML = active.map(t => `<li><button data-todo-open="${esc(t.id)}">${esc(t.title)}</button></li>`).join("");
+  $("#done").hidden = !done.length;
+  $("#done-list").innerHTML = done.map(t => {
+    const img = todoImage(t);
+    return `
+    <li class="done-item">
+      ${img ? `<button class="done-thumb" data-view="${esc(img)}" aria-label="查看图片"><img src="${esc(img)}" alt="" loading="lazy"></button>` : ""}
+      <div class="done-text"><span class="done-title">${esc(t.title)}</span><small>${esc(fmtDay(t.done_at))}做完</small></div>
+      ${canEdit() ? `<div class="tools"><button class="del" data-todo-undo="${esc(t.id)}">放回天上</button>${delBtn("todos", t.id)}</div>` : ""}
+    </li>`;
+  }).join("");
+  $("#sky-add").hidden = $("#sky-more").hidden = !canEdit();
+  if (!canEdit()) toggleSettings(false);
+}
+
+function renderWindow() {
+  const dlg = $("#todo-window"), t = data.todos.find(x => x.id === openId);
+  cloudFx?.stop(); cloudFx = null;
+  if (!t) { closeTodo(); return; }
+  const img = todoImage(t);
+  dlg.innerHTML = `
+    <div class="tw">
+      <button class="tw-close" data-todo-close aria-label="关闭">×</button>
+      ${canEdit() ? `<input class="tw-title" value="${esc(t.title)}" maxlength="40" aria-label="想做的事，点这里可以改" data-todo-title>`
+        : `<h3 class="tw-title">${esc(t.title)}</h3>`}
+      ${img ? `<div class="tw-img"><img src="${esc(img)}" alt="" crossorigin="anonymous"><canvas aria-hidden="true"></canvas></div>` : ""}
+      ${canEdit() ? `
+        <label class="tw-upload">${img ? "换一张图片" : "上传图片"}<input type="file" accept="image/*" data-todo-photo></label>
+        <div class="tw-actions">${delBtn("todos", t.id)}<button class="primary" data-todo-done>做完了</button></div>` : ""}
+      <p class="status" role="status"></p>
+    </div>`;
+  const im = $(".tw-img img", dlg);
+  im?.addEventListener("load", () => {
+    $(".tw-img", dlg).style.aspectRatio = `${im.naturalWidth} / ${im.naturalHeight}`;
+    cloudFx?.stop();
+    cloudFx = imageCloud($(".tw-img canvas", dlg), im);
+  }, { once: true });
+}
+
+// 点开气泡：窗口从气泡的位置放大出来
+function openTodo(id, at) {
+  const dlg = $("#todo-window");
+  openId = id;
+  renderWindow();
+  if (!dlg.open) dlg.showModal();
+  if (at && motionOK()) {
+    const r = dlg.getBoundingClientRect();
+    dlg.style.transformOrigin = `${at.x - r.left}px ${at.y - r.top}px`;
+    dlg.animate([{ transform: "scale(.12)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 420, easing: "cubic-bezier(.2,.8,.2,1)" });
+  }
+}
+
+function closeTodo() {
+  const dlg = $("#todo-window");
+  if (!dlg.open) return;
+  if (!motionOK()) { dlg.close(); return; }
+  dlg.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "scale(.7)" }], { duration: 220, easing: "ease-in" })
+    .onfinish = () => dlg.close();
+}
+$("#todo-window").addEventListener("close", () => { cloudFx?.stop(); cloudFx = null; openId = null; });
+$("#todo-window").addEventListener("click", e => { if (e.target.id === "todo-window") closeTodo(); });
+
+function windowStatus(text) { const st = $("#todo-window .status"); if (st) st.textContent = text; }
+const sqlHint = err => /todo|site_settings/.test(err.message || "") ? "（数据库还没建好「想做的事」的表，请先运行更新用的 SQL）" : "";
+
+async function saveTodoTitle(input) {
+  const t = data.todos.find(x => x.id === openId), title = input.value.trim();
+  if (!t) return;
+  if (!title || title === t.title) { input.value = t.title; return; }
+  const { error } = await sb.from("todos").update({ title }).eq("id", t.id);
+  if (error) { windowStatus(`没有改成功：${error.message}${sqlHint(error)}。`); return; }
+  t.title = title;
+  renderTodos();
+  windowStatus("改好了。");
+}
+
+async function setTodoDone(id, done) {
+  const { error } = await sb.from("todos").update({ done_at: done ? new Date().toISOString() : null }).eq("id", id);
+  if (error) {
+    if (done) windowStatus(`没有保存成功：${error.message}${sqlHint(error)}。`); else alert("没有保存成功：" + error.message);
+    return;
+  }
+  if (done) closeTodo();
+  await load(); render();
+}
+
+async function uploadTodoPhoto(file) {
+  const t = data.todos.find(x => x.id === openId);
+  if (!t) return;
+  windowStatus("正在上传图片…");
+  try {
+    const old = t.photos || [];
+    await uploadPhoto({ todo_id: t.id }, file, 0);
+    for (const p of old) {
+      const r = await sb.from("photos").delete().eq("id", p.id);
+      if (r.error) throw r.error;
+      if (!isLocalAsset(p.path)) await sb.storage.from(cfg.photoBucket).remove([p.path]);
+    }
+    await load(); render(); renderWindow();
+  } catch (err) {
+    console.error(err);
+    windowStatus(`没有上传成功：${err.message || err}${sqlHint(err)}。`);
+  }
+}
+
+function todoClick(e) {
+  const t = e.target;
+  const open = t.closest("[data-todo-open]");
+  if (open) { openTodo(open.dataset.todoOpen); return true; }
+  if (t.closest("[data-todo-close]")) { closeTodo(); return true; }
+  if (t.closest("[data-todo-done]")) { t.closest("button").disabled = true; setTodoDone(openId, true); return true; }
+  const undo = t.closest("[data-todo-undo]");
+  if (undo) { setTodoDone(undo.dataset.todoUndo, false); return true; }
+  if (t.closest("#sky-more")) { toggleSettings(); return true; }
+  if (t.closest("[data-sky-reset]")) { settingsTouched = true; sky.setConfig(DEFAULTS); renderSettings(); saveSettings(); return true; }
+  if (!$("#sky-settings").hidden && !t.closest("#sky-settings")) toggleSettings(false);
+  return false;
+}
+
+document.addEventListener("change", e => {
+  if (e.target.matches("[data-todo-title]")) saveTodoTitle(e.target);
+  if (e.target.matches("[data-todo-photo]") && e.target.files[0]) uploadTodoPhoto(e.target.files[0]);
+  if (e.target.matches("[data-sky]")) saveSettings();
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && e.target.matches("[data-todo-title]")) e.target.blur();
+});
+
+$("#sky-add").addEventListener("submit", async e => {
+  e.preventDefault();
+  const form = e.target, input = form.elements.title, btn = form.querySelector("button");
+  const title = input.value.trim();
+  if (!title) return;
+  btn.disabled = true;
+  const { error } = await sb.from("todos").insert({ title });
+  btn.disabled = false;
+  if (error) { alert(`没有放上去：${error.message}${sqlHint(error)}。`); return; }
+  input.value = "";
+  await load(); render();
+});
+
+/* 右上角三个点：调气泡和粒子。调好的样子存进数据库，来看的人看到的也是这样 */
+const fmtParam = (k, v) => k === "particleOpacity" ? `${Math.round(v * 100)}%` : String(+(+v).toFixed(2));
+function renderSettings() {
+  const c = sky.cfg;
+  $("#sky-settings").innerHTML = `
+    <h4>设置</h4>
+    ${PARAMS.map(([k, name, min, max, step]) => `
+      <label>${name}
+        <span class="sky-range"><input type="range" min="${min}" max="${max}" step="${step}" value="${c[k]}" data-sky="${k}"><output>${fmtParam(k, c[k])}</output></span>
+      </label>`).join("")}
+    <div class="sky-set-foot"><button type="button" class="link" data-sky-reset>恢复默认</button><small class="status" role="status"></small></div>`;
+}
+function toggleSettings(show) {
+  const panel = $("#sky-settings"), btn = $("#sky-more");
+  show ??= panel.hidden;
+  if (show) renderSettings();
+  panel.hidden = !show;
+  btn.setAttribute("aria-expanded", String(show));
+}
+document.addEventListener("input", e => {
+  if (!e.target.matches("[data-sky]")) return;
+  settingsTouched = true;
+  const k = e.target.dataset.sky;
+  sky.setConfig({ ...sky.cfg, [k]: +e.target.value });
+  e.target.nextElementSibling.textContent = fmtParam(k, e.target.value);
+});
+let saveTimer = 0;
+function saveSettings() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    const st = $("#sky-settings .status");
+    const value = { ...sky.cfg };
+    const { error } = await sb.from("site_settings").upsert({ key: "todo_canvas", value, updated_at: new Date().toISOString() });
+    if (!st) return;
+    st.textContent = error ? `没有保存：${error.message}${sqlHint(error)}` : "已保存";
+    if (!error) data.settings.todo_canvas = value;
+  }, 500);
+}
+
 /* ---------------- pages ---------------- */
-const PAGES = ["trips", "shows", "notes", "cream"];
+const PAGES = ["trips", "shows", "notes", "todos", "cream"];
 function route() {
   if (location.hash === "#klim") history.replaceState(null, "", "#cream"); // 旧链接
   const page = PAGES.includes(location.hash.slice(1)) ? location.hash.slice(1) : "trips";
   document.querySelectorAll("main > .block").forEach(sec => (sec.hidden = sec.id !== page));
+  sky.setActive(page === "todos");
   document.querySelectorAll(".tabs a").forEach(a => {
     if (a.getAttribute("href") === "#" + page) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");

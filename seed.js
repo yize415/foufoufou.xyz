@@ -12,4 +12,7 @@ window.SEED = {
   ],
   shows: [],
   notes: [],
+  todos: ["去日本", "玩 Slay the Spire", "恋爱小甜剧", "Puzzle Hunt", "语言学"]
+    .map((title, i) => ({ id: `seed-todo-${i}`, title, done_at: null, photos: [] })),
+  settings: {},
 };

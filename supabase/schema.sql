@@ -47,15 +47,29 @@ create table if not exists public.shows (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.todos (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  done_at timestamptz, -- 空着是还想做的事，填了时间就是做过的事
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.site_settings (
+  key text primary key,
+  value jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.photos (
   id uuid primary key default gen_random_uuid(),
   trip_id uuid references public.trips(id) on delete cascade,
   show_id uuid references public.shows(id) on delete cascade,
+  todo_id uuid references public.todos(id) on delete cascade,
   path text not null,
   caption text,
   sort int not null default 0,
   created_at timestamptz not null default now(),
-  constraint photos_one_owner check (num_nonnulls(trip_id, show_id) = 1)
+  constraint photos_one_owner check (num_nonnulls(trip_id, show_id, todo_id) = 1)
 );
 
 create table if not exists public.notes (
@@ -69,7 +83,7 @@ create table if not exists public.notes (
 do $$
 declare t text;
 begin
-  foreach t in array array['trips','photos','shows','notes'] loop
+  foreach t in array array['trips','photos','shows','notes','todos','site_settings'] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists "public read" on public.%I', t);
     execute format('drop policy if exists "members insert" on public.%I', t);
